@@ -95,7 +95,16 @@ static void UpdateScreen(void)
         screen.pv_voltage_mV = (uint32_t)milli(measure->vin_V);
         screen.battery_voltage_mV = (uint32_t)milli(measure->vout_V);
         screen.pv_current_mA = milli(measure->ipv_A);
-        screen.pv_power_mW = milli(measure->ppv_W);
+				screen.pv_current_mA = milli(measure->ipv_A);
+
+				if ((screen.pv_current_mA > -30) &&
+						(screen.pv_current_mA < 30))
+				{
+						screen.pv_current_mA = 0;
+				}
+
+				screen.pv_power_mW =
+						(screen.pv_voltage_mV * screen.pv_current_mA) / 1000;
         screen.date_time = "ADS OK | BUCK OFF";
     } else {
         screen.pv_voltage_mV = screen.battery_voltage_mV = MPPT_UI_U32_NA;
