@@ -34,3 +34,4 @@ fw_mppt\main.o: ../Core/Inc/fonts.h
 fw_mppt\main.o: ../Core/Inc/fonts_config.h
 fw_mppt\main.o: ../Core/Inc/mppt_ui.h
 fw_mppt\main.o: ../Core/Inc/mppt_measure.h
+fw_mppt\main.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h

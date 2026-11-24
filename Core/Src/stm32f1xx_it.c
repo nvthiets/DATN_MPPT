@@ -52,6 +52,50 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+/* Emergency shutdown for THIS rewired STM32F103 board:
+ * PB11 = IR2104 SD (LOW disables both gates)
+ * PA8  = IR2104 IN / TIM1_CH1
+ * PB10 = BCCU relay transistor (LOW commands relay OFF)
+ *
+ * Direct register access: no HAL handle, SysTick, delay, I2C or SPI needed.
+ * GPIO clocks may not yet be enabled if a fault occurs during startup.
+ * This is best-effort CPU fault handling, not hardware overcurrent protection.
+ */
+static void Buck_EmergencyOff(void)
+{
+    __disable_irq();
+
+    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN;
+    (void)RCC->APB2ENR; /* Clock-enable readback before GPIO access. */
+
+    /* 1. Assert shutdown BEFORE disabling PWM or changing the IN pin mode.
+     * Write the LOW latch first, then force SD to ordinary push-pull output.
+     */
+    GPIOB->BSRR = ((uint32_t)GPIO_PIN_11 << 16U);
+    GPIOB->CRH = (GPIOB->CRH & ~(GPIO_CRH_MODE11 | GPIO_CRH_CNF11)) |
+                  GPIO_CRH_MODE11_1; /* Output push-pull, 2 MHz. */
+    __DSB();
+
+    /* 2. Do not access TIM1 if its peripheral clock is still disabled. */
+    if ((RCC->APB2ENR & RCC_APB2ENR_TIM1EN) != 0U) {
+        TIM1->BDTR &= ~TIM_BDTR_MOE;
+        TIM1->CCER &= ~(TIM_CCER_CC1E | TIM_CCER_CC1NE);
+        TIM1->CR1 &= ~TIM_CR1_CEN;
+        TIM1->CCR1 = 0U;
+    }
+
+    /* 3. Disconnect PA8 from alternate-function PWM and hold IN LOW. */
+    GPIOA->BSRR = ((uint32_t)GPIO_PIN_8 << 16U);
+    GPIOA->CRH = (GPIOA->CRH & ~(GPIO_CRH_MODE8 | GPIO_CRH_CNF8)) |
+                  GPIO_CRH_MODE8_1;
+
+    /* 4. Command relay OFF only after the gate driver is disabled. */
+    GPIOB->BSRR = ((uint32_t)GPIO_PIN_10 << 16U);
+    GPIOB->CRH = (GPIOB->CRH & ~(GPIO_CRH_MODE10 | GPIO_CRH_CNF10)) |
+                  GPIO_CRH_MODE10_1;
+    __DSB();
+}
+
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -69,7 +113,7 @@
 void NMI_Handler(void)
 {
   /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
-
+  Buck_EmergencyOff();
   /* USER CODE END NonMaskableInt_IRQn 0 */
   /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
    while (1)
@@ -84,7 +128,7 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-
+  Buck_EmergencyOff();
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
@@ -99,7 +143,7 @@ void HardFault_Handler(void)
 void MemManage_Handler(void)
 {
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-
+  Buck_EmergencyOff();
   /* USER CODE END MemoryManagement_IRQn 0 */
   while (1)
   {
@@ -114,7 +158,7 @@ void MemManage_Handler(void)
 void BusFault_Handler(void)
 {
   /* USER CODE BEGIN BusFault_IRQn 0 */
-
+  Buck_EmergencyOff();
   /* USER CODE END BusFault_IRQn 0 */
   while (1)
   {
@@ -129,7 +173,7 @@ void BusFault_Handler(void)
 void UsageFault_Handler(void)
 {
   /* USER CODE BEGIN UsageFault_IRQn 0 */
-
+  Buck_EmergencyOff();
   /* USER CODE END UsageFault_IRQn 0 */
   while (1)
   {
